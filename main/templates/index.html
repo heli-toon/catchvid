@@ -1,0 +1,35 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="stylesheet" href="{% static 'style.css' %}" />
+    <link rel="stylesheet" href="{% static 'script.js' %}" />
+    <title>CatchVid</title>
+  </head>
+  <body>
+    <h1>CatchVid Youtube Video Downloader</h1>
+    <section class="downloader">
+      <p>Download Youtube Videos in MP4. No Ads</p>
+      <form class="downloaderform" action="" method="post">
+        {% csrf_token %}
+        <div class="form-control">
+          <input
+            type="url"
+            name="link"
+            id="url"
+            placeholder="Enter or Paste youtube video url"
+            class="url-field"
+            required
+          />
+          <button type="submit" class="submit">Download</button>
+        </div>
+      </form>
+      <div class="error-message">{{ error_message }}</div>
+      <div>
+        <progress id="progress-bar" value="0" max="100"></progress>
+      </div>
+    </section>
+  </body>
+</html>

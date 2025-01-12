@@ -1,0 +1,193 @@
+If you're hosting the application on **Vercel**, you can implement a Django server that:
+
+1. Processes a YouTube video URL.
+2. Extracts the video.
+3. Provides a downloadable link to the client.
+
+Here’s how you can set it up:
+
+---
+
+### **Key Steps to Implement the Server**
+
+1. **Accept YouTube URLs via API**:
+   - The server accepts POST requests with the YouTube video URL.
+
+2. **Download the Video Temporarily**:
+   - Use `pytube` to fetch and save the video in a temporary directory on the server.
+
+3. **Generate a Downloadable Link**:
+   - Serve the downloaded file via Django's `MEDIA_URL`.
+   - Provide a link to the client for download.
+
+4. **Deploy on Vercel**:
+   - Deploy your Django project as an API server.
+
+---
+
+### **Code for the Django Server**
+
+#### 1. **Update `settings.py`**
+Add `MEDIA_URL` and `MEDIA_ROOT` for serving downloaded files.
+
+```python
+import os
+
+# Media settings for serving files
+MEDIA_URL = '/media/'
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+
+# Add media settings in development
+if DEBUG:
+    from django.conf.urls.static import static
+    urlpatterns += static(MEDIA_URL, document_root=MEDIA_ROOT)
+```
+
+---
+
+#### 2. **Create a View for Handling Downloads**
+
+```python
+from django.shortcuts import render
+from django.http import JsonResponse
+from pytube import YouTube
+import os
+from django.conf import settings
+import uuid
+
+def download_video(request):
+    if request.method == 'POST':
+        try:
+            # Get YouTube URL from the request
+            link = request.POST.get('link')
+            if not link:
+                return JsonResponse({'error': 'No link provided'}, status=400)
+            
+            # Fetch video
+            yt = YouTube(link)
+            stream = yt.streams.get_highest_resolution()
+
+            # Generate unique filename
+            unique_filename = f"{uuid.uuid4()}.mp4"
+
+            # Save file to MEDIA_ROOT
+            output_path = os.path.join(settings.MEDIA_ROOT, 'downloads')
+            os.makedirs(output_path, exist_ok=True)
+            file_path = os.path.join(output_path, unique_filename)
+            stream.download(output_path=output_path, filename=unique_filename)
+
+            # Generate the file URL
+            file_url = f"{settings.MEDIA_URL}downloads/{unique_filename}"
+            full_url = request.build_absolute_uri(file_url)
+
+            return JsonResponse({
+                'message': 'Download link generated successfully',
+                'download_url': full_url
+            })
+        except Exception as e:
+            return JsonResponse({'error': str(e)}, status=500)
+
+    return JsonResponse({'error': 'Invalid request method'}, status=400)
+```
+
+---
+
+#### 3. **Update URLs**
+
+Add a route for the download endpoint:
+
+```python
+from django.urls import path
+from . import views
+
+urlpatterns = [
+    path('api/download/', views.download_video, name='download_video'),
+]
+```
+
+---
+
+#### 4. **Frontend Integration**
+
+If you’re building a frontend (or mobile app) to interact with this API, you can make a POST request to `/api/download/` with the YouTube video URL.
+
+Example:
+
+```javascript
+async function fetchDownloadLink(videoUrl) {
+    try {
+        const response = await fetch('https://your-vercel-domain/api/download/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ link: videoUrl }),
+        });
+
+        const data = await response.json();
+        if (response.ok) {
+            console.log('Download URL:', data.download_url);
+        } else {
+            console.error('Error:', data.error);
+        }
+    } catch (error) {
+        console.error('Request failed:', error);
+    }
+}
+```
+
+---
+
+### **Deploy to Vercel**
+
+1. **Prepare Your Django App for Vercel**:
+   - Use the `vercel.json` file to configure Vercel to handle Django's API endpoints.
+   - Example `vercel.json`:
+
+     ```json
+     {
+       "builds": [
+         {
+           "src": "manage.py",
+           "use": "@vercel/python"
+         }
+       ],
+       "routes": [
+         {
+           "src": "/api/.*",
+           "dest": "/manage.py"
+         }
+       ]
+     }
+     ```
+
+2. **Test Media File Serving**:
+   - Ensure your media files are served properly. On Vercel, you might need to configure a storage service like **AWS S3** or **Cloudinary** if persistent storage is needed. For temporary file hosting, Vercel should suffice.
+
+3. **Deploy**:
+   - Push your Django project to GitHub or GitLab and connect it to Vercel.
+   - Vercel will build and deploy your project.
+
+---
+
+### **User Flow**
+
+1. The user submits a YouTube URL via the frontend.
+2. The frontend sends the URL to the `/api/download/` endpoint.
+3. The server processes the URL, downloads the video, and stores it temporarily.
+4. The server returns a public download URL.
+5. The user clicks the link to download the video.
+
+---
+
+### **Limitations to Consider**
+
+1. **Temporary Storage**:
+   - Vercel’s file storage is ephemeral, meaning files may not persist long. Use cloud storage (e.g., S3 or Cloudinary) for permanent storage.
+
+2. **Large Files**:
+   - Downloading large videos can exceed Vercel’s execution time limit for serverless functions. Consider using background jobs (e.g., Celery with Redis) or streaming downloads directly to the client.
+
+---
+
+Let me know if you'd like help with cloud storage integration or deploying this to Vercel!

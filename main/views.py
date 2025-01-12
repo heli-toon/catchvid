@@ -29,7 +29,6 @@ def home(request):
             video = YouTube(link)
             stream = video.streams.get_lowest_resolution()
             stream.download()
-
         
             if platform.system() == 'Windows':
                 output_path = os.path.join(os.path.expanduser('~'), 'Downloads')
@@ -40,7 +39,6 @@ def home(request):
             # elif platform.system() == 'Android':
             #     Environment = autoclass('android.os.Environment')
             #     output_path = os.path.join(Environment.getExternalStorageDirectory().getPath(), 'Download')
-
             else:
                 raise Exception('Unsupported operating system')
 
